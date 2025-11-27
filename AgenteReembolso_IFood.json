@@ -1,0 +1,240 @@
+{
+  "name": "AgenteReembolso_IFood",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ia-operacional",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        384,
+        0
+      ],
+      "id": "526ccfcb-aa52-444b-bab4-a74e28a5041a",
+      "name": "Webhook",
+      "webhookId": "638881a2-1fc5-4192-8927-772180a834ab"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        0
+      ],
+      "id": "28eba24e-5a86-4945-a53b-8268d40fcc13",
+      "name": "Extract from File",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Pergunta do usuário:\n{{ $json.pergunta_do_cliente }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "=Você é um Agente Operacional de Suporte ao Cliente do iFood.\nSua tarefa é responder a pergunta do cliente com base **EXCLUSIVAMENTE** na \"Base de conhecimento\" fornecida.\n\n**REGRAS OBRIGATÓRIAS:**\n1.  **Restrição de Conhecimento:** Responda apenas com informações encontradas na Base de Conhecimento.\n2.  **Fallback:** Se a Base de Conhecimento for insuficiente ou não contiver uma resposta clara, a resposta final deve ser: \"Não tenho política suficiente para responder isso. Encaminhe para suporte.\"\n\nPergunta do Cliente: {{ $json[\"pergunta_do_cliente\"] }}\n\nBase de conhecimento:\n{{ $json[\"meu_contexto_agrupado\"] }}\n\no agente deve identificar exceções e diferenciar motivos, encontrar soluções como políticas de reembolso automático e mencionar validação de estorno ou ticket\n\nestipule um valor de confiança de 0 - 100; se a confiança for 0 use o fallback, else use o texto que conseguir pensar\n\ninforme o valor de confiança junto do texto"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "da1be074-fc0a-4c28-801e-ec01abc49c95",
+      "name": "Basic LLM Chain",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "fileSelector": "D:/n8n/base_conhecimento_ifood_genai-exemplo.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        608,
+        0
+      ],
+      "id": "b69dca59-c12d-480c-8a0b-373c48977da6",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega todos os itens que chegaram do CSV\nconst items = $input.all();\n\n// Cria uma lista de textos formatados\nconst listaTextos = items.map(item => {\n  const dados = item.json;\n  return `Categoria: ${dados.categoria}\\nPergunta: ${dados.pergunta}\\nResposta: ${dados.resposta}\\nFonte: ${dados.fonte}`;\n});\n\n// Junta tudo em um único textoão separado por duas quebras de linha\nconst contextoFinal = listaTextos.join('\\n\\n--- separador ---\\n\\n');\n\n// Retorna apenas UM item contendo todo o conhecimento\nreturn {\n  json: {\n    meu_contexto_agrupado: contextoFinal\n  }\n};\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "f79b787b-22b8-4da7-8226-f36ecb0f3cfb",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "9db6fcac-e231-4e71-8821-6c0f18ca4492",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"pergunta_do_cliente\": {{$json.body.pergunta}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        -224
+      ],
+      "id": "aa07b5df-1345-4fc0-93a4-5e79d65bf822",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        160
+      ],
+      "id": "986ce48f-1808-4566-80fc-81cec0d1cde3",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "UYsLDoYqpEw2KjoD",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        []
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "cd97dcb7-bb3d-4ae9-b78c-dbacd2e99bb6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "726753ac02af5f72f075e9619f42c2c7694cfd0471aec97aa7edeafbd62db8cf"
+  },
+  "id": "ulFX3AlJuHEResDg",
+  "tags": []
+}
